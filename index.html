@@ -183,17 +183,27 @@
     <section class="panel">
       <form id="search-form">
         <div class="rpc-section">
-          <label class="field-label-row" for="rpcUrl">
+          <label class="field-label-row" for="rpcSelect">
             <span>RPC 节点 <span class="lbl-en">(RPC Endpoint)</span></span>
-            <span class="info-tip" title="公共节点有限速，建议使用 Helius/QuickNode 等付费 RPC">i</span>
+            <span class="info-tip" title="公共节点有限速，如遇 403/429 错误请切换节点或填入付费 RPC">i</span>
           </label>
-          <div class="hash-input-row">
-            <div class="input-icon-wrap">
-              <span class="glyph-input" aria-hidden="true">&#x26A1;</span>
-              <input id="rpcUrl" name="rpcUrl" value="https://mainnet.helius-rpc.com/?api-key=899d8ca2-8066-46a0-830c-c9dc71685fba" placeholder="输入 Solana RPC URL" required />
-            </div>
+          <div class="field-stack">
+            <label for="rpcSelect">选择节点</label>
+            <select id="rpcSelect" name="rpcSelect">
+              <option value="https://api.mainnet-beta.solana.com">Solana 官方 (mainnet-beta)</option>
+              <option value="https://solana-api.projectserum.com">Project Serum</option>
+              <option value="https://rpc.ankr.com/solana">Ankr 公共节点</option>
+              <option value="https://solana.public-rpc.com">Public-RPC.com</option>
+              <option value="https://rpc.helius.xyz">Helius (需 API Key)</option>
+              <option value="https://solana-mainnet.g.alchemy.com/v2">Alchemy (需 API Key)</option>
+              <option value="custom">自定义 RPC URL...</option>
+            </select>
           </div>
-          <span class="field-note">公共节点限速严重，建议输入你的付费 RPC URL 以获得更好的体验。</span>
+          <div id="customRpcRow" class="field-stack" style="display:none; margin-top: 12px;">
+            <label for="rpcUrl">自定义 URL</label>
+            <input id="rpcUrl" name="rpcUrl" placeholder="https://mainnet.helius-rpc.com/?api-key=你的KEY" />
+          </div>
+          <span class="field-note">公共节点免费但限速，如频繁出错请切换节点或填入你自己的付费 RPC（Helius/QuickNode/Alchemy 等）。</span>
         </div>
 
         <div class="form-row">
@@ -1470,12 +1480,30 @@ const accountAddressInput = document.getElementById("accountAddress");
 const poolCandidatesEl = document.getElementById("poolCandidates");
 const windowInput = document.getElementById("window");
 const windowRangeSummaryEl = document.getElementById("window-range-summary");
+const rpcSelect = document.getElementById("rpcSelect");
 const rpcUrlInput = document.getElementById("rpcUrl");
+const customRpcRow = document.getElementById("customRpcRow");
+
+rpcSelect.addEventListener("change", () => {
+  if (rpcSelect.value === "custom") {
+    customRpcRow.style.display = "";
+    rpcUrlInput.focus();
+  } else {
+    customRpcRow.style.display = "none";
+    rpcUrlInput.value = "";
+  }
+});
 
 let progressTimer = null;
 let progressValue = 0;
 
-function getRpcUrl() { return rpcUrlInput.value.trim() || PUBLIC_RPC_URL; }
+function getRpcUrl() {
+  if (rpcSelect.value === "custom") {
+    const custom = rpcUrlInput.value.trim();
+    if (custom) return custom;
+  }
+  return rpcSelect.value || PUBLIC_RPC_URL;
+}
 
 function setStatus(message, type = "") {
   statusEl.textContent = message || "";
@@ -1809,7 +1837,9 @@ poolCandidatesEl.addEventListener("change", event => {
 clearBtn.addEventListener("click", () => {
   form.reset();
   windowInput.value = 1;
-  rpcUrlInput.value = "https://mainnet.helius-rpc.com/?api-key=899d8ca2-8066-46a0-830c-c9dc71685fba";
+  rpcSelect.value = "https://api.mainnet-beta.solana.com";
+  rpcUrlInput.value = "";
+  customRpcRow.style.display = "none";
   accountAddressInput.value = "";
   resetPoolCandidates();
   updateWindowRangeSummary();
