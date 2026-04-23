@@ -190,7 +190,7 @@
           <div class="hash-input-row">
             <div class="input-icon-wrap">
               <span class="glyph-input" aria-hidden="true">&#x26A1;</span>
-              <input id="rpcUrl" name="rpcUrl" value="https://api.mainnet-beta.solana.com" placeholder="输入 Solana RPC URL" required />
+              <input id="rpcUrl" name="rpcUrl" value="https://mainnet.helius-rpc.com/?api-key=899d8ca2-8066-46a0-830c-c9dc71685fba" placeholder="输入 Solana RPC URL" required />
             </div>
           </div>
           <span class="field-note">公共节点限速严重，建议输入你的付费 RPC URL 以获得更好的体验。</span>
@@ -1809,7 +1809,7 @@ poolCandidatesEl.addEventListener("change", event => {
 clearBtn.addEventListener("click", () => {
   form.reset();
   windowInput.value = 1;
-  rpcUrlInput.value = PUBLIC_RPC_URL;
+  rpcUrlInput.value = "https://mainnet.helius-rpc.com/?api-key=899d8ca2-8066-46a0-830c-c9dc71685fba";
   accountAddressInput.value = "";
   resetPoolCandidates();
   updateWindowRangeSummary();
