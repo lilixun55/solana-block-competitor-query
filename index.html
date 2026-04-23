@@ -190,12 +190,7 @@
           <div class="field-stack">
             <label for="rpcSelect">选择节点</label>
             <select id="rpcSelect" name="rpcSelect">
-              <option value="https://api.mainnet-beta.solana.com">Solana 官方 (mainnet-beta)</option>
-              <option value="https://solana-api.projectserum.com">Project Serum</option>
-              <option value="https://rpc.ankr.com/solana">Ankr 公共节点</option>
-              <option value="https://solana.public-rpc.com">Public-RPC.com</option>
-              <option value="https://rpc.helius.xyz">Helius (需 API Key)</option>
-              <option value="https://solana-mainnet.g.alchemy.com/v2">Alchemy (需 API Key)</option>
+              <option value="https://go.getblock.us/efc7577f268440789c186220da8c82c0">GetBlock 公共节点 (推荐)</option>
               <option value="custom">自定义 RPC URL...</option>
             </select>
           </div>
@@ -203,7 +198,7 @@
             <label for="rpcUrl">自定义 URL</label>
             <input id="rpcUrl" name="rpcUrl" placeholder="https://mainnet.helius-rpc.com/?api-key=你的KEY" />
           </div>
-          <span class="field-note">公共节点免费但限速，如频繁出错请切换节点或填入你自己的付费 RPC（Helius/QuickNode/Alchemy 等）。</span>
+          <span class="field-note">公共节点免费但有限速，如频繁出错请切换到你的付费 RPC（Helius/QuickNode/Alchemy 等填入自定义 URL）。</span>
         </div>
 
         <div class="form-row">
@@ -310,7 +305,7 @@
 "use strict";
 
 // ── Constants ──────────────────────────────────────────────────────────────
-const PUBLIC_RPC_URL = "https://api.mainnet-beta.solana.com";
+const PUBLIC_RPC_URL = "https://go.getblock.us/efc7577f268440789c186220da8c82c0";
 const RPC_TIMEOUT_MS = 45000;
 const MAX_WINDOW = 300;
 const MULTIPLE_ACCOUNTS_BATCH_SIZE = 100;
@@ -1837,7 +1832,7 @@ poolCandidatesEl.addEventListener("change", event => {
 clearBtn.addEventListener("click", () => {
   form.reset();
   windowInput.value = 1;
-  rpcSelect.value = "https://api.mainnet-beta.solana.com";
+  rpcSelect.value = "https://go.getblock.us/efc7577f268440789c186220da8c82c0";
   rpcUrlInput.value = "";
   customRpcRow.style.display = "none";
   accountAddressInput.value = "";
