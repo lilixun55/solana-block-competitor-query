@@ -183,26 +183,26 @@
     <section class="panel">
       <form id="search-form">
         <div class="rpc-section">
-          <label class="field-label-row" for="heliusApiKey">
-            <span>Helius API Key</span>
-            <span class="info-tip" title="填入你的 Helius API Key，自动拼接为 RPC 端点。也可切换到自定义 RPC。">i</span>
+          <label class="field-label-row" for="rpcSelect">
+            <span>RPC 节点 <span class="lbl-en">(RPC Endpoint)</span></span>
+            <span class="info-tip" title="公共节点有限速，如遇 403/429 错误请切换节点或填入付费 RPC">i</span>
           </label>
           <div class="field-stack">
-            <label for="rpcMode">模式</label>
-            <select id="rpcMode" name="rpcMode">
-              <option value="helius">Helius API Key</option>
-              <option value="custom">自定义 RPC URL</option>
+            <label for="rpcSelect">选择节点</label>
+            <select id="rpcSelect" name="rpcSelect">
+              <option value="https://api.mainnet-beta.solana.com">Solana 官方公共节点</option>
+              <option value="https://mainnet.helius-rpc.com/?api-key=899d8ca2-8066-46a0-830c-c9dc71685fba">Helius 公共节点</option>
+              <option value="https://rpc.ankr.com/solana">Ankr 公共节点</option>
+              <option value="https://solana-api.projectserum.com">Serum 公共节点</option>
+              <option value="https://go.getblock.us/efc7577f268440789c186220da8c82c0">GetBlock 公共节点</option>
+              <option value="custom">自定义 RPC URL...</option>
             </select>
-          </div>
-          <div id="heliusKeyRow" class="field-stack" style="margin-top: 12px;">
-            <label for="heliusApiKey">API Key</label>
-            <input id="heliusApiKey" name="heliusApiKey" placeholder="粘贴你的 Helius API Key" />
           </div>
           <div id="customRpcRow" class="field-stack" style="display:none; margin-top: 12px;">
             <label for="rpcUrl">自定义 URL</label>
             <input id="rpcUrl" name="rpcUrl" placeholder="https://mainnet.helius-rpc.com/?api-key=你的KEY" />
           </div>
-          <span class="field-note">在 <a href="https://dev.helius.xyz/" target="_blank" rel="noopener noreferrer">dev.helius.xyz</a> 获取免费 API Key，填入后即可使用。</span>
+          <span class="field-note">公共节点免费但有限速，如频繁出错请切换到你的付费 RPC（Helius/QuickNode/Alchemy 等填入自定义 URL）。</span>
         </div>
 
         <div class="form-row">
@@ -309,7 +309,7 @@
 "use strict";
 
 // ── Constants ──────────────────────────────────────────────────────────────
-const HELIUS_RPC_BASE = "https://mainnet.helius-rpc.com/?api-key=";
+const DEFAULT_RPC_URL = "https://api.mainnet-beta.solana.com";
 const RPC_TIMEOUT_MS = 45000;
 const MAX_WINDOW = 300;
 const MULTIPLE_ACCOUNTS_BATCH_SIZE = 100;
@@ -1479,21 +1479,17 @@ const accountAddressInput = document.getElementById("accountAddress");
 const poolCandidatesEl = document.getElementById("poolCandidates");
 const windowInput = document.getElementById("window");
 const windowRangeSummaryEl = document.getElementById("window-range-summary");
-const rpcMode = document.getElementById("rpcMode");
-const heliusApiKeyInput = document.getElementById("heliusApiKey");
-const heliusKeyRow = document.getElementById("heliusKeyRow");
+const rpcSelect = document.getElementById("rpcSelect");
 const rpcUrlInput = document.getElementById("rpcUrl");
 const customRpcRow = document.getElementById("customRpcRow");
 
-rpcMode.addEventListener("change", () => {
-  if (rpcMode.value === "custom") {
+rpcSelect.addEventListener("change", () => {
+  if (rpcSelect.value === "custom") {
     customRpcRow.style.display = "";
-    heliusKeyRow.style.display = "none";
     rpcUrlInput.focus();
   } else {
     customRpcRow.style.display = "none";
-    heliusKeyRow.style.display = "";
-    heliusApiKeyInput.focus();
+    rpcUrlInput.value = "";
   }
 });
 
@@ -1501,13 +1497,11 @@ let progressTimer = null;
 let progressValue = 0;
 
 function getRpcUrl() {
-  if (rpcMode.value === "custom") {
+  if (rpcSelect.value === "custom") {
     const custom = rpcUrlInput.value.trim();
     if (custom) return custom;
   }
-  const apiKey = heliusApiKeyInput.value.trim();
-  if (apiKey) return HELIUS_RPC_BASE + apiKey;
-  return HELIUS_RPC_BASE;
+  return rpcSelect.value || DEFAULT_RPC_URL;
 }
 
 function setStatus(message, type = "") {
@@ -1842,10 +1836,8 @@ poolCandidatesEl.addEventListener("change", event => {
 clearBtn.addEventListener("click", () => {
   form.reset();
   windowInput.value = 1;
-  rpcMode.value = "helius";
-  heliusApiKeyInput.value = "";
+  rpcSelect.value = "https://api.mainnet-beta.solana.com";
   rpcUrlInput.value = "";
-  heliusKeyRow.style.display = "";
   customRpcRow.style.display = "none";
   accountAddressInput.value = "";
   resetPoolCandidates();
