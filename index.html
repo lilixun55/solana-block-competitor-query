@@ -190,11 +190,7 @@
           <div class="field-stack">
             <label for="rpcSelect">选择节点</label>
             <select id="rpcSelect" name="rpcSelect">
-              <option value="https://api.mainnet-beta.solana.com">Solana 官方公共节点</option>
               <option value="https://mainnet.helius-rpc.com/?api-key=899d8ca2-8066-46a0-830c-c9dc71685fba">Helius 公共节点</option>
-              <option value="https://rpc.ankr.com/solana">Ankr 公共节点</option>
-              <option value="https://solana-api.projectserum.com">Serum 公共节点</option>
-              <option value="https://go.getblock.us/efc7577f268440789c186220da8c82c0">GetBlock 公共节点</option>
               <option value="custom">自定义 RPC URL...</option>
             </select>
           </div>
@@ -1836,7 +1832,7 @@ poolCandidatesEl.addEventListener("change", event => {
 clearBtn.addEventListener("click", () => {
   form.reset();
   windowInput.value = 1;
-  rpcSelect.value = "https://api.mainnet-beta.solana.com";
+  rpcSelect.value = "https://mainnet.helius-rpc.com/?api-key=899d8ca2-8066-46a0-830c-c9dc71685fba";
   rpcUrlInput.value = "";
   customRpcRow.style.display = "none";
   accountAddressInput.value = "";
