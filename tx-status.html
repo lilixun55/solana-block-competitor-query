@@ -15,6 +15,7 @@
       --accent: #0b7a5a;
       --accent-2: #0d5e78;
       --danger: #b33a3a;
+      --danger-bg: rgba(179,58,58,0.09);
       --success: #198754;
       --shadow: 0 22px 60px rgba(25,52,44,0.15);
       --radius: 22px;
@@ -293,6 +294,35 @@
       line-height: 1.1;
       white-space: nowrap;
     }
+    .result-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+    .filter-control {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 260px;
+    }
+    .filter-control label {
+      white-space: nowrap;
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--text);
+    }
+    .filter-control select {
+      min-width: 150px;
+      padding: 10px 13px;
+    }
+    .display-count {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+    }
     .table-wrap {
       overflow: auto;
       border-radius: 18px;
@@ -343,6 +373,13 @@
     }
     .status-success { color: var(--success); font-weight: 800; }
     .status-failed { color: var(--danger); font-weight: 800; }
+    .row-failed td {
+      color: var(--danger) !important;
+      background: var(--danger-bg) !important;
+    }
+    .row-failed a {
+      color: var(--danger) !important;
+    }
     @media (max-width: 760px) {
       body { padding: 16px; }
       .panel, .hero { padding: 18px; }
@@ -353,6 +390,9 @@
       .actions { flex-direction: column; align-items: stretch; }
       button { width: 100%; }
       .summary { grid-template-columns: 1fr; }
+      .result-toolbar { align-items: stretch; }
+      .filter-control { width: 100%; min-width: 0; }
+      .filter-control select { width: 100%; }
     }
   </style>
 </head>
@@ -416,6 +456,17 @@
     </section>
 
     <section class="panel">
+      <div class="result-toolbar">
+        <div class="filter-control">
+          <label for="filterSelect">结果筛选</label>
+          <select id="filterSelect">
+            <option value="all">显示全部</option>
+            <option value="success">只看成功</option>
+            <option value="failed">只看失败</option>
+          </select>
+        </div>
+        <div id="displayCount" class="display-count">当前显示 0 条</div>
+      </div>
       <div class="table-wrap">
         <table>
           <colgroup><col style="width: 15%;"><col style="width: 55%;"><col style="width: 30%;"></colgroup>
@@ -446,6 +497,9 @@ const resultBody = document.getElementById("result-body");
 const rpcSelect = document.getElementById("rpcSelect");
 const rpcUrlInput = document.getElementById("rpcUrl");
 const customRpcRow = document.getElementById("customRpcRow");
+const filterSelect = document.getElementById("filterSelect");
+const displayCountEl = document.getElementById("displayCount");
+let latestResults = [];
 
 rpcSelect.addEventListener("change", () => {
   if (rpcSelect.value === "custom") {
@@ -455,6 +509,10 @@ rpcSelect.addEventListener("change", () => {
     customRpcRow.style.display = "none";
     rpcUrlInput.value = "";
   }
+});
+
+filterSelect.addEventListener("change", () => {
+  renderResults(latestResults);
 });
 
 let progressTimer = null;
@@ -512,20 +570,38 @@ function renderSummary(data) {
     '</div>';
 }
 
+function getFilteredResults(results) {
+  const filter = filterSelect.value;
+  if (filter === "success") return results.filter(result => result.status === "success");
+  if (filter === "failed") return results.filter(result => result.status !== "success");
+  return results;
+}
+
 function renderResults(results) {
-  if (!results || results.length === 0) {
-    resultBody.innerHTML = '<tr><td colspan="3" class="empty">没有查询结果。</td></tr>';
+  const source = results || [];
+  const filtered = getFilteredResults(source);
+  const filterText = filterSelect.options[filterSelect.selectedIndex].text;
+  displayCountEl.textContent = "当前显示 " + filtered.length + " 条 / 总共 " + source.length + " 条（" + filterText + "）";
+  if (source.length === 0) {
+    resultBody.innerHTML = '<tr><td colspan="3" class="empty">还没有查询结果。</td></tr>';
     return;
   }
-  resultBody.innerHTML = results.map(result => {
+  if (filtered.length === 0) {
+    resultBody.innerHTML = '<tr><td colspan="3" class="empty">当前筛选条件下没有结果。</td></tr>';
+    return;
+  }
+  resultBody.innerHTML = filtered.map(result => {
     const hash = result.hash;
     const shortHash = hash.substring(0, 15);
-    const statusClass = result.status === "success" ? "status-success" : "status-failed";
+    const isSuccess = result.status === "success";
+    const statusClass = isSuccess ? "status-success" : "status-failed";
+    const rowClass = isSuccess ? "row-success" : "row-failed";
+    const statusText = isSuccess ? "成功" : "失败";
     const slot = result.slot || "N/A";
-    return '<tr>' +
+    return '<tr class="' + rowClass + '">' +
       '<td class="mono">' + slot + '</td>' +
       '<td class="mono"><a href="https://solscan.io/tx/' + hash + '" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:none;" title="' + hash + '">' + shortHash + '..</a></td>' +
-      '<td class="' + statusClass + '">' + (result.status === "success" ? "成功" : "失败") + '</td>' +
+      '<td class="' + statusClass + '">' + statusText + '</td>' +
       '</tr>';
   }).join("");
 }
@@ -609,14 +685,16 @@ async function handleSubmit(event) {
   try {
     const rpcUrl = getRpcUrl();
     const allResults = await querySignatureStatusesBatch(rpcUrl, hashes);
+    latestResults = allResults;
     const successCount = allResults.filter(r => r.status === "success").length;
     const failedCount = allResults.length - successCount;
     renderSummary({ total: allResults.length, success: successCount, failed: failedCount });
-    renderResults(allResults);
-    setStatus("查询完成，共 " + allResults.length + " 个交易，成功 " + successCount + " 个。");
+    renderResults(latestResults);
+    setStatus("查询完成，共 " + allResults.length + " 个交易，成功 " + successCount + " 个，失败/未找到 " + failedCount + " 个。");
   } catch (error) {
+    latestResults = [];
     renderSummary(null);
-    renderResults([]);
+    renderResults(latestResults);
     setStatus(error.message || "查询失败", "error");
   } finally {
     finishProgress();
@@ -628,8 +706,10 @@ form.addEventListener("submit", handleSubmit);
 
 clearBtn.addEventListener("click", () => {
   document.getElementById("hashInput").value = "";
+  latestResults = [];
+  filterSelect.value = "all";
   renderSummary(null);
-  resultBody.innerHTML = '<tr><td colspan="3" class="empty">还没有查询结果。</td></tr>';
+  renderResults(latestResults);
   setStatus("");
 });
 </script>
