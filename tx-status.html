@@ -16,6 +16,8 @@
       --accent-2: #0d5e78;
       --danger: #b33a3a;
       --danger-bg: rgba(179,58,58,0.09);
+      --warn: #8a6d2f;
+      --warn-bg: rgba(157,131,74,0.10);
       --success: #198754;
       --shadow: 0 22px 60px rgba(25,52,44,0.15);
       --radius: 22px;
@@ -267,7 +269,7 @@
     }
     .summary {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(5, minmax(0, 1fr));
       gap: 12px;
       margin-top: 18px;
     }
@@ -333,7 +335,7 @@
       width: 100%;
       border-collapse: separate;
       border-spacing: 0;
-      min-width: 720px;
+      min-width: 820px;
     }
     th,
     td {
@@ -364,6 +366,11 @@
       overflow: hidden;
       text-overflow: ellipsis;
     }
+    .seq {
+      font-family: Consolas, "Courier New", monospace;
+      color: var(--muted);
+      white-space: nowrap;
+    }
     .empty {
       padding: 26px;
       color: var(--muted);
@@ -373,12 +380,26 @@
     }
     .status-success { color: var(--success); font-weight: 800; }
     .status-failed { color: var(--danger); font-weight: 800; }
-    .row-failed td {
+    .status-query-failed { color: var(--danger); font-weight: 800; }
+    .status-not-found { color: var(--warn); font-weight: 800; }
+    .row-failed td,
+    .row-query-failed td {
       color: var(--danger) !important;
       background: var(--danger-bg) !important;
     }
-    .row-failed a {
+    .row-failed a,
+    .row-query-failed a {
       color: var(--danger) !important;
+    }
+    .row-not-found td {
+      color: var(--warn) !important;
+      background: var(--warn-bg) !important;
+    }
+    .row-not-found a {
+      color: var(--warn) !important;
+    }
+    @media (max-width: 980px) {
+      .summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
     @media (max-width: 760px) {
       body { padding: 16px; }
@@ -463,22 +484,30 @@
             <option value="all">显示全部</option>
             <option value="success">只看成功</option>
             <option value="failed">只看失败</option>
+            <option value="not_found">只看未找到</option>
+            <option value="query_failed">只看查询失败</option>
           </select>
         </div>
         <div id="displayCount" class="display-count">当前显示 0 条</div>
       </div>
       <div class="table-wrap">
         <table>
-          <colgroup><col style="width: 15%;"><col style="width: 55%;"><col style="width: 30%;"></colgroup>
+          <colgroup>
+            <col style="width: 10%;">
+            <col style="width: 15%;">
+            <col style="width: 50%;">
+            <col style="width: 25%;">
+          </colgroup>
           <thead>
             <tr>
+              <th>序号</th>
               <th>区块号</th>
               <th>哈希缩写</th>
               <th>状态</th>
             </tr>
           </thead>
           <tbody id="result-body">
-            <tr><td colspan="3" class="empty">还没有查询结果。</td></tr>
+            <tr><td colspan="4" class="empty">还没有查询结果。</td></tr>
           </tbody>
         </table>
       </div>
@@ -556,25 +585,54 @@ function finishProgress() {
   }, 260);
 }
 
+function pct(count, total) {
+  return total > 0 ? ((count / total) * 100).toFixed(1) : "0.0";
+}
+
 function renderSummary(data) {
   if (!data) {
     summaryEl.innerHTML = "";
     return;
   }
-  const successRate = data.total > 0 ? ((data.success / data.total) * 100).toFixed(1) : 0;
-  const failedRate = data.total > 0 ? ((data.failed / data.total) * 100).toFixed(1) : 0;
   summaryEl.innerHTML = '<div class="summary">' +
     '<div class="metric"><div class="label">查询总数</div><div class="value">' + data.total + '</div></div>' +
-    '<div class="metric"><div class="label">成功 (' + successRate + '%)</div><div class="value">' + data.success + '</div></div>' +
-    '<div class="metric"><div class="label">失败/未找到 (' + failedRate + '%)</div><div class="value">' + data.failed + '</div></div>' +
+    '<div class="metric"><div class="label">成功 (' + pct(data.success, data.total) + '%)</div><div class="value">' + data.success + '</div></div>' +
+    '<div class="metric"><div class="label">失败 (' + pct(data.failed, data.total) + '%)</div><div class="value">' + data.failed + '</div></div>' +
+    '<div class="metric"><div class="label">未找到 (' + pct(data.notFound, data.total) + '%)</div><div class="value">' + data.notFound + '</div></div>' +
+    '<div class="metric"><div class="label">查询失败 (' + pct(data.queryFailed, data.total) + '%)</div><div class="value">' + data.queryFailed + '</div></div>' +
     '</div>';
 }
 
 function getFilteredResults(results) {
   const filter = filterSelect.value;
   if (filter === "success") return results.filter(result => result.status === "success");
-  if (filter === "failed") return results.filter(result => result.status !== "success");
+  if (filter === "failed") return results.filter(result => result.status === "failed");
+  if (filter === "not_found") return results.filter(result => result.status === "not_found");
+  if (filter === "query_failed") return results.filter(result => result.status === "query_failed");
   return results;
+}
+
+function statusText(status) {
+  if (status === "success") return "成功";
+  if (status === "failed") return "失败";
+  if (status === "not_found") return "未找到";
+  if (status === "query_failed") return "查询失败";
+  return "未知";
+}
+
+function statusClass(status) {
+  if (status === "success") return "status-success";
+  if (status === "failed") return "status-failed";
+  if (status === "not_found") return "status-not-found";
+  if (status === "query_failed") return "status-query-failed";
+  return "";
+}
+
+function rowClass(status) {
+  if (status === "failed") return "row-failed";
+  if (status === "not_found") return "row-not-found";
+  if (status === "query_failed") return "row-query-failed";
+  return "row-success";
 }
 
 function renderResults(results) {
@@ -583,27 +641,29 @@ function renderResults(results) {
   const filterText = filterSelect.options[filterSelect.selectedIndex].text;
   displayCountEl.textContent = "当前显示 " + filtered.length + " 条 / 总共 " + source.length + " 条（" + filterText + "）";
   if (source.length === 0) {
-    resultBody.innerHTML = '<tr><td colspan="3" class="empty">还没有查询结果。</td></tr>';
+    resultBody.innerHTML = '<tr><td colspan="4" class="empty">还没有查询结果。</td></tr>';
     return;
   }
   if (filtered.length === 0) {
-    resultBody.innerHTML = '<tr><td colspan="3" class="empty">当前筛选条件下没有结果。</td></tr>';
+    resultBody.innerHTML = '<tr><td colspan="4" class="empty">当前筛选条件下没有结果。</td></tr>';
     return;
   }
   resultBody.innerHTML = filtered.map(result => {
     const hash = result.hash;
     const shortHash = hash.substring(0, 15);
-    const isSuccess = result.status === "success";
-    const statusClass = isSuccess ? "status-success" : "status-failed";
-    const rowClass = isSuccess ? "row-success" : "row-failed";
-    const statusText = isSuccess ? "成功" : "失败";
     const slot = result.slot || "N/A";
-    return '<tr class="' + rowClass + '">' +
+    const title = result.error ? hash + "\n" + result.error : hash;
+    return '<tr class="' + rowClass(result.status) + '">' +
+      '<td class="seq">#' + result.seq + '</td>' +
       '<td class="mono">' + slot + '</td>' +
-      '<td class="mono"><a href="https://solscan.io/tx/' + hash + '" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:none;" title="' + hash + '">' + shortHash + '..</a></td>' +
-      '<td class="' + statusClass + '">' + statusText + '</td>' +
+      '<td class="mono"><a href="https://solscan.io/tx/' + hash + '" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:none;" title="' + title.replace(/"/g, '&quot;') + '">' + shortHash + '..</a></td>' +
+      '<td class="' + statusClass(result.status) + '">' + statusText(result.status) + '</td>' +
       '</tr>';
   }).join("");
+}
+
+function makeResult(hash, seq, status, slot, error, extra) {
+  return Object.assign({ hash, seq, status, slot: slot || null, error: error || null }, extra || {});
 }
 
 async function querySignatureStatusesBatch(rpcUrl, hashes) {
@@ -628,37 +688,40 @@ async function querySignatureStatusesBatch(rpcUrl, hashes) {
       });
       if (!response.ok) throw new Error("HTTP " + response.status);
       const data = await response.json();
-      if (data.result && data.result.value) {
+      if (data.error) {
+        const errorText = typeof data.error === "string" ? data.error : JSON.stringify(data.error);
+        for (let j = 0; j < batch.length; j++) {
+          allResults.push(makeResult(batch[j], i + j + 1, "query_failed", null, errorText));
+        }
+        continue;
+      }
+      if (data.result && Array.isArray(data.result.value)) {
         const statuses = data.result.value;
         for (let j = 0; j < batch.length; j++) {
           const sigStatus = statuses[j];
           if (sigStatus) {
             const isFailed = sigStatus.err !== null;
-            allResults.push({
-              hash: batch[j],
-              status: isFailed ? "failed" : "success",
-              slot: sigStatus.slot,
-              confirmations: sigStatus.confirmations,
-              err: sigStatus.err
-            });
+            allResults.push(makeResult(
+              batch[j],
+              i + j + 1,
+              isFailed ? "failed" : "success",
+              sigStatus.slot,
+              isFailed ? JSON.stringify(sigStatus.err) : null,
+              { confirmations: sigStatus.confirmations, err: sigStatus.err }
+            ));
           } else {
-            allResults.push({
-              hash: batch[j],
-              status: "failed",
-              slot: null,
-              error: "Transaction not found"
-            });
+            allResults.push(makeResult(batch[j], i + j + 1, "not_found", null, "Transaction not found"));
           }
         }
       } else {
-        for (const hash of batch) {
-          allResults.push({ hash: hash, status: "failed", slot: null, error: data.error ? JSON.stringify(data.error) : "RPC error" });
+        for (let j = 0; j < batch.length; j++) {
+          allResults.push(makeResult(batch[j], i + j + 1, "query_failed", null, "Invalid RPC response"));
         }
       }
     } catch (e) {
       const msg = e.name === "AbortError" ? "请求超时" : e.message;
-      for (const hash of batch) {
-        allResults.push({ hash: hash, status: "failed", slot: null, error: msg });
+      for (let j = 0; j < batch.length; j++) {
+        allResults.push(makeResult(batch[j], i + j + 1, "query_failed", null, msg));
       }
     } finally {
       clearTimeout(timeout);
@@ -680,17 +743,25 @@ async function handleSubmit(event) {
     return;
   }
   queryBtn.disabled = true;
-  setStatus("正在查询 " + hashes.length + " 个交易（单次 RPC 请求）...", "loading");
+  setStatus("正在查询 " + hashes.length + " 个交易...", "loading");
   startProgress();
   try {
     const rpcUrl = getRpcUrl();
     const allResults = await querySignatureStatusesBatch(rpcUrl, hashes);
     latestResults = allResults;
     const successCount = allResults.filter(r => r.status === "success").length;
-    const failedCount = allResults.length - successCount;
-    renderSummary({ total: allResults.length, success: successCount, failed: failedCount });
+    const failedCount = allResults.filter(r => r.status === "failed").length;
+    const notFoundCount = allResults.filter(r => r.status === "not_found").length;
+    const queryFailedCount = allResults.filter(r => r.status === "query_failed").length;
+    renderSummary({
+      total: allResults.length,
+      success: successCount,
+      failed: failedCount,
+      notFound: notFoundCount,
+      queryFailed: queryFailedCount,
+    });
     renderResults(latestResults);
-    setStatus("查询完成，共 " + allResults.length + " 个交易，成功 " + successCount + " 个，失败/未找到 " + failedCount + " 个。");
+    setStatus("查询完成，共 " + allResults.length + " 个交易，成功 " + successCount + " 个，失败 " + failedCount + " 个，未找到 " + notFoundCount + " 个，查询失败 " + queryFailedCount + " 个。");
   } catch (error) {
     latestResults = [];
     renderSummary(null);
