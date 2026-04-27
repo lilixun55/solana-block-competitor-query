@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Solana 批量交易状态查询</title>
+  <style>
+    :root { --bg-1: #f5f1e8; --bg-2: #dce9df; --card: rgba(255,255,255,0.88); --line: rgba(45,69,58,0.12); --text: #1d2c26; --muted: #567268; --accent: #0b7a5a; --accent-2: #0d5e78; --shadow: 0 22p[...]
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <section class="hero">
+      <div class="hero-title-row">
+        <div class="brand-mark" aria-hidden="true"></div>
+        <div>
+          <h1>Solana 批量交易状态查询</h1>
+          <p class="hero-lead">纯前端版本 — 批量输入交易哈希，快速查询交易状态。所有数据在浏览器端直接从 Helius RPC 获取，无需后端服务。</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <form id="query-form">
+        <div class="rpc-section">
+          <label class="field-label-row" for="rpcSelect">
+            <span>RPC 节点 <span class="lbl-en">(RPC Endpoint)</span></span>
+            <span class="info-tip" title="公共节点有限速，如遇错误请切换到自定义 RPC">i</span>
+          </label>
+          <div class="field-stack">
+            <label for="rpcSelect">选择节点</label>
+            <select id="rpcSelect" name="rpcSelect">
+              <option value="https://mainnet.helius-rpc.com/?api-key=899d8ca2-8066-46a0-830c-c9dc71685fba">Helius 公共节点</option>
+              <option value="custom">自定义 RPC URL...</option>
+            </select>
+          </div>
+          <div id="customRpcRow" class="field-stack" style="display:none; margin-top: 12px;">
+            <label for="rpcUrl">自定义 URL</label>
+            <input id="rpcUrl" name="rpcUrl" placeholder="https://mainnet.helius-rpc.com/?api-key=你的KEY" />
+          </div>
+          <span class="field-note">公共节点免费但有限速，如频繁出错请切换到你的付费 RPC（Helius/QuickNode/Alchemy 等填入自定义 URL）。</span>
+        </div>
+
+        <div class="field-block">
+          <label class="field-label-row" for="hashInput">
+            <span>交易哈希 <span class="lbl-en">(Transaction Hashes)</span></span>
+            <span class="info-tip" title="每行一个哈希，或用逗号、空格分隔">i</span>
+          </label>
+          <textarea id="hashInput" placeholder="请输入交易哈希（每行一个，或用逗号/空格分隔）
+
+示例：
+5x7gE...hash1
+3k9fA...hash2"></textarea>
+        </div>
+
+        <div class="actions">
+          <button type="submit" class="primary" id="queryBtn">批量查询</button>
+          <button type="button" class="secondary" id="clearBtn">清空</button>
+        </div>
+      </form>
+
+      <div id="status" class="status"></div>
+      <div id="progress-wrap" class="progress-wrap"><div id="progress-bar" class="progress-bar"></div></div>
+      <div id="summary"></div>
+    </section>
+
+    <section class="panel">
+      <div class="table-wrap">
+        <table>
+          <colgroup><col style="width: 15%;"><col style="width: 55%;"><col style="width: 30%;"></colgroup>
+          <thead>
+            <tr>
+              <th>区块号</th>
+              <th>哈希缩写</th>
+              <th>状态</th>
+            </tr>
+          </thead>
+          <tbody id="result-body">
+            <tr><td colspan="3" class="empty">还没有查询结果。</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+<script>
+const RPC_TIMEOUT_MS = 45000;
+const form = document.getElementById("query-form");
+const queryBtn = document.getElementById("queryBtn");
+const clearBtn = document.getElementById("clearBtn");
+const statusEl = document.getElementById("status");
+const progressWrapEl = document.getElementById("progress-wrap");
+const progressBarEl = document.getElementById("progress-bar");
+const summaryEl = document.getElementById("summary");
+const resultBody = document.getElementById("result-body");
+const rpcSelect = document.getElementById("rpcSelect");
+const rpcUrlInput = document.getElementById("rpcUrl");
+const customRpcRow = document.getElementById("customRpcRow");
+
+rpcSelect.addEventListener("change", () => {
+  if (rpcSelect.value === "custom") {
+    customRpcRow.style.display = "";
+    rpcUrlInput.focus();
+  } else {
+    customRpcRow.style.display = "none";
+    rpcUrlInput.value = "";
+  }
+});
+
+let progressTimer = null;
+let progressValue = 0;
+
+function getRpcUrl() {
+  if (rpcSelect.value === "custom") {
+    const custom = rpcUrlInput.value.trim();
+    if (custom) return custom;
+  }
+  return rpcSelect.value;
+}
+
+function setStatus(message, type) {
+  if (!type) type = "";
+  statusEl.textContent = message || "";
+  statusEl.className = "status" + (type ? " " + type : "");
+}
+
+function startProgress() {
+  progressValue = 6;
+  progressBarEl.style.width = progressValue + "%";
+  progressWrapEl.classList.add("show");
+  if (progressTimer) clearInterval(progressTimer);
+  progressTimer = setInterval(() => {
+    progressValue = Math.min(92, progressValue + (100 - progressValue) * 0.08);
+    progressBarEl.style.width = progressValue + "%";
+  }, 180);
+}
+
+function finishProgress() {
+  if (progressTimer) {
+    clearInterval(progressTimer);
+    progressTimer = null;
+  }
+  progressValue = 100;
+  progressBarEl.style.width = "100%";
+  setTimeout(() => {
+    progressWrapEl.classList.remove("show");
+    progressBarEl.style.width = "0%";
+  }, 260);
+}
+
+function renderSummary(data) {
+  if (!data) {
+    summaryEl.innerHTML = "";
+    return;
+  }
+  const successRate = data.total > 0 ? ((data.success / data.total) * 100).toFixed(1) : 0;
+  const failedRate = data.total > 0 ? ((data.failed / data.total) * 100).toFixed(1) : 0;
+  summaryEl.innerHTML = '<div class="summary">' +
+    '<div class="metric"><div class="label">查询总数</div><div class="value">' + data.total + '</div></div>' +
+    '<div class="metric"><div class="label">成功 (' + successRate + '%)</div><div class="value">' + data.success + '</div></div>' +
+    '<div class="metric"><div class="label">失败/未找到 (' + failedRate + '%)</div><div class="value">' + data.failed + '</div></div>' +
+    '</div>';
+}
+
+function renderResults(results) {
+  if (!results || results.length === 0) {
+    resultBody.innerHTML = '<tr><td colspan="3" class="empty">没有查询结果。</td></tr>';
+    return;
+  }
+  resultBody.innerHTML = results.map(result => {
+    const hash = result.hash;
+    const shortHash = hash.substring(0, 15);
+    const statusClass = result.status === "success" ? "status-success" : "status-failed";
+    const slot = result.slot || "N/A";
+    return '<tr>' +
+      '<td class="mono">' + slot + '</td>' +
+      '<td class="mono"><a href="https://solscan.io/tx/' + hash + '" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:none;" title="' + hash + '">' + shortHash + '..</a></td>' +
+      '<td class="' + statusClass + '">' + (result.status === "success" ? "成功" : "失败") + '</td>' +
+      '</tr>';
+  }).join("");
+}
+
+async function querySignatureStatusesBatch(rpcUrl, hashes) {
+  const BATCH_SIZE = 250;
+  const allResults = [];
+  for (let i = 0; i < hashes.length; i += BATCH_SIZE) {
+    const batch = hashes.slice(i, i + BATCH_SIZE);
+    const request = {
+      jsonrpc: "2.0",
+      id: 1,
+      method: "getSignatureStatuses",
+      params: [batch, { searchTransactionHistory: true }]
+    };
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), RPC_TIMEOUT_MS);
+    try {
+      const response = await fetch(rpcUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(request),
+        signal: controller.signal,
+      });
+      if (!response.ok) throw new Error("HTTP " + response.status);
+      const data = await response.json();
+      if (data.result && data.result.value) {
+        const statuses = data.result.value;
+        for (let j = 0; j < batch.length; j++) {
+          const sigStatus = statuses[j];
+          if (sigStatus) {
+            const isFailed = sigStatus.err !== null;
+            allResults.push({
+              hash: batch[j],
+              status: isFailed ? "failed" : "success",
+              slot: sigStatus.slot,
+              confirmations: sigStatus.confirmations,
+              err: sigStatus.err
+            });
+          } else {
+            allResults.push({
+              hash: batch[j],
+              status: "failed",
+              slot: null,
+              error: "Transaction not found"
+            });
+          }
+        }
+      } else {
+        for (const hash of batch) {
+          allResults.push({ hash: hash, status: "failed", slot: null, error: data.error ? JSON.stringify(data.error) : "RPC error" });
+        }
+      }
+    } catch (e) {
+      const msg = e.name === "AbortError" ? "请求超时" : e.message;
+      for (const hash of batch) {
+        allResults.push({ hash: hash, status: "failed", slot: null, error: msg });
+      }
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+  return allResults;
+}
+
+async function handleSubmit(event) {
+  event.preventDefault();
+  const input = document.getElementById("hashInput").value.trim();
+  if (!input) {
+    setStatus("请输入交易哈希", "error");
+    return;
+  }
+  const hashes = input.split(/[\n,，\s]+/).map(h => h.trim()).filter(h => h);
+  if (hashes.length === 0) {
+    setStatus("请输入交易哈希", "error");
+    return;
+  }
+  queryBtn.disabled = true;
+  setStatus("正在查询 " + hashes.length + " 个交易（单次 RPC 请求）...", "loading");
+  startProgress();
+  try {
+    const rpcUrl = getRpcUrl();
+    const allResults = await querySignatureStatusesBatch(rpcUrl, hashes);
+    const successCount = allResults.filter(r => r.status === "success").length;
+    const failedCount = allResults.length - successCount;
+    renderSummary({ total: allResults.length, success: successCount, failed: failedCount });
+    renderResults(allResults);
+    setStatus("查询完成，共 " + allResults.length + " 个交易，成功 " + successCount + " 个。");
+  } catch (error) {
+    renderSummary(null);
+    renderResults([]);
+    setStatus(error.message || "查询失败", "error");
+  } finally {
+    finishProgress();
+    queryBtn.disabled = false;
+  }
+}
+
+form.addEventListener("submit", handleSubmit);
+
+clearBtn.addEventListener("click", () => {
+  document.getElementById("hashInput").value = "";
+  renderSummary(null);
+  resultBody.innerHTML = '<tr><td colspan="3" class="empty">还没有查询结果。</td></tr>';
+  setStatus("");
+});
+</script>
+</body>
+</html>
