@@ -5,7 +5,355 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Solana 批量交易状态查询</title>
   <style>
-    :root { --bg-1: #f5f1e8; --bg-2: #dce9df; --card: rgba(255,255,255,0.88); --line: rgba(45,69,58,0.12); --text: #1d2c26; --muted: #567268; --accent: #0b7a5a; --accent-2: #0d5e78; --shadow: 0 22p[...]
+    :root {
+      --bg-1: #f5f1e8;
+      --bg-2: #dce9df;
+      --card: rgba(255,255,255,0.88);
+      --line: rgba(45,69,58,0.12);
+      --text: #1d2c26;
+      --muted: #567268;
+      --accent: #0b7a5a;
+      --accent-2: #0d5e78;
+      --danger: #b33a3a;
+      --success: #198754;
+      --shadow: 0 22px 60px rgba(25,52,44,0.15);
+      --radius: 22px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "SimSun", "Songti SC", "STSong", serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(255,255,255,0.92), transparent 32%),
+        radial-gradient(circle at bottom right, rgba(20,94,120,0.18), transparent 26%),
+        linear-gradient(135deg, var(--bg-1), var(--bg-2));
+      padding: 28px;
+    }
+    .shell {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: grid;
+      gap: 18px;
+    }
+    .hero,
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+    }
+    .hero {
+      padding: 22px 26px;
+      display: grid;
+      gap: 12px;
+    }
+    .hero-title-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+    }
+    .brand-mark {
+      width: 44px;
+      height: 44px;
+      border-radius: 14px;
+      flex-shrink: 0;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      box-shadow: 0 8px 22px rgba(11,122,90,0.28);
+      position: relative;
+    }
+    .brand-mark::after {
+      content: "";
+      position: absolute;
+      inset: 10px;
+      border-radius: 6px;
+      border: 2px solid rgba(255,255,255,0.85);
+      opacity: 0.9;
+    }
+    h1 {
+      margin: 0;
+      font-size: clamp(21px, 2.8vw, 30px);
+      line-height: 1.15;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+    }
+    .hero-lead {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.55;
+      max-width: 800px;
+    }
+    .top-nav {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      padding-top: 2px;
+    }
+    .top-nav a {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 34px;
+      padding: 7px 12px;
+      border-radius: 999px;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+      background: rgba(255,255,255,0.72);
+      border: 1px solid rgba(41,68,57,0.12);
+    }
+    .top-nav a:hover { border-color: rgba(11,122,90,0.35); }
+    .panel { padding: 22px; }
+    form { display: grid; gap: 18px; }
+    .rpc-section {
+      margin-bottom: 2px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid var(--line);
+      display: grid;
+      gap: 12px;
+    }
+    .field-block { display: grid; gap: 9px; min-width: 0; }
+    .field-label-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 2px;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .lbl-en {
+      font-weight: 600;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .info-tip {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--muted);
+      border: 1px solid rgba(41,68,57,0.18);
+      background: rgba(255,255,255,0.8);
+      cursor: help;
+      flex-shrink: 0;
+    }
+    .field-stack {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+    .field-stack label {
+      display: block;
+      margin: 0;
+      white-space: nowrap;
+      flex-shrink: 0;
+      min-width: 88px;
+      font-size: 14px;
+      font-weight: 700;
+    }
+    input,
+    select,
+    textarea {
+      width: 100%;
+      border: 1px solid rgba(41,68,57,0.18);
+      border-radius: 14px;
+      padding: 13px 14px;
+      font-size: 15px;
+      color: var(--text);
+      background: rgba(255,255,255,0.92);
+      transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+      font-family: inherit;
+    }
+    textarea {
+      min-height: 180px;
+      line-height: 1.55;
+      resize: vertical;
+      font-family: Consolas, "Courier New", monospace;
+    }
+    input:focus,
+    select:focus,
+    textarea:focus {
+      outline: none;
+      border-color: rgba(11,122,90,0.6);
+      box-shadow: 0 0 0 4px rgba(11,122,90,0.1);
+      transform: translateY(-1px);
+    }
+    .field-note {
+      font-size: 13px;
+      color: var(--muted);
+      font-weight: 500;
+      line-height: 1.55;
+    }
+    .actions {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    button {
+      border: 0;
+      border-radius: 999px;
+      padding: 12px 22px;
+      font-size: 15px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: transform 0.18s ease, opacity 0.18s ease, box-shadow 0.18s ease;
+      font-family: inherit;
+    }
+    button:hover { transform: translateY(-1px); }
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .primary {
+      color: #fff;
+      background: linear-gradient(180deg,#2d5d5f 0%,#244750 52%,#1c3a40 100%);
+      box-shadow: 0 12px 28px rgba(45,93,95,0.28);
+    }
+    .secondary {
+      background: rgba(255,255,255,0.72);
+      color: var(--text);
+      border: 1px solid rgba(41,68,57,0.12);
+    }
+    .status {
+      min-height: 26px;
+      margin-top: 14px;
+      font-size: 14px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+    .status.error { color: var(--danger); }
+    .status.loading::before {
+      content: "";
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      margin-right: 8px;
+      border-radius: 50%;
+      border: 2px solid rgba(11,122,90,0.18);
+      border-top-color: var(--accent);
+      vertical-align: -2px;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .progress-wrap {
+      height: 8px;
+      border-radius: 999px;
+      background: rgba(11,122,90,0.12);
+      overflow: hidden;
+      margin-top: 8px;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+    .progress-wrap.show { opacity: 1; }
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg,#0b7a5a,#0d5e78);
+      transition: width 0.25s ease;
+    }
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 18px;
+    }
+    .metric {
+      padding: 16px 14px;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.66);
+      border: 1px solid rgba(41,68,57,0.1);
+      min-height: 92px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    .metric .label {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 7px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .metric .value {
+      font-size: 24px;
+      font-weight: 800;
+      line-height: 1.1;
+      white-space: nowrap;
+    }
+    .table-wrap {
+      overflow: auto;
+      border-radius: 18px;
+      border: 1px solid rgba(41,68,57,0.12);
+      background: rgba(255,255,255,0.6);
+    }
+    table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      min-width: 720px;
+    }
+    th,
+    td {
+      padding: 13px 14px;
+      text-align: left;
+      border-bottom: 1px solid rgba(41,68,57,0.08);
+      vertical-align: top;
+      font-size: 15px;
+      font-weight: 700;
+    }
+    th {
+      position: sticky;
+      top: 0;
+      background: rgba(245,248,246,0.98);
+      color: var(--muted);
+      font-size: 13px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      z-index: 10;
+      box-shadow: 0 1px 0 rgba(41,68,57,0.08);
+    }
+    tr:last-child td { border-bottom: 0; }
+    td.mono {
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 14px;
+      line-height: 1.45;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .empty {
+      padding: 26px;
+      color: var(--muted);
+      text-align: center;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .status-success { color: var(--success); font-weight: 800; }
+    .status-failed { color: var(--danger); font-weight: 800; }
+    @media (max-width: 760px) {
+      body { padding: 16px; }
+      .panel, .hero { padding: 18px; }
+      .hero-title-row { gap: 12px; }
+      .brand-mark { width: 38px; height: 38px; border-radius: 12px; }
+      .field-stack { display: grid; gap: 8px; }
+      .field-stack label { min-width: 0; }
+      .actions { flex-direction: column; align-items: stretch; }
+      button { width: 100%; }
+      .summary { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
@@ -17,6 +365,9 @@
           <h1>Solana 批量交易状态查询</h1>
           <p class="hero-lead">纯前端版本 — 批量输入交易哈希，快速查询交易状态。所有数据在浏览器端直接从 Helius RPC 获取，无需后端服务。</p>
         </div>
+      </div>
+      <div class="top-nav">
+        <a href="./index.html">返回高级查询</a>
       </div>
     </section>
 
